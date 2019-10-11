@@ -1,0 +1,558 @@
+---
+title: "Portfolio Project - Part 1"
+author: "Jasmin Mousavi"
+date: "10/7/2019"
+output: html_document
+---
+## **Gun Violence in the USA** 
+***
+> Why did I choose this topic?
+
+Recently I have noticed many gun violence incidents. It is to the point where there have been more incidents than there have been days in this year. Hearing about such violences that happen every day makes this country immune to this type of news, when it should be taken more seriously. 
+
+I am interested in seeing trends that exist in gun violience and discover if there are any ways to predict or lessen such violences. I know that twitter has the ability to predict social unrest, and would be interested in finding out if such violences could be predicted through analyzing social media content.
+***
+> What Dataset am I using?
+
+* I found gun violence dataset on kaggle: https://www.kaggle.com/jameslko/gun-violence-data 
+  + This dataset spans from January 2013 to March 2018
+  + This dataset contains over 260k observations
+  + This dataset contains 29 variables
+* The dataset was obtained through a python script that scraped off this website: gunviolencearchive.org
+  + The website states that: "Gun Violence Archive (GVA) is a not for profit corporation formed in 2013 to provide free online public access to accurate information about gun-related violence in the United States. GVA will collect and check for accuracy, comprehensive information about gun-related violence in the U.S. and then post and disseminate it online"
+* Potential risks with that come with obtain this data:
+  + Trusting the user wrote a proper web scraper
+  + Trusting gunviolencearchive.org
+  + Since gunviolencearchive.org gathers its data from news articles, then we would also have to trust that the articles are reporting accurately
+  
+***
+> What variables am I using?
+
+Although the dataset has 29 variables I am only using 
+* Categorical variables:
+  + incident_id - unique identifier for each incident 
+  + participant_name - the name of the participant involved in the incident 
+  + participant_age_group - participants categorizied into age ranges
+  + participant_gender - participant gender
+  + participant_status - describes if the participant was killed, injured, arrested, or unharmed
+  + participant_type - describes if the participant was a victim or suspect/subject
+  + state_house_district - the state house district number that incident occured in 
+  + state_senate_district - the state senate district number that incident occured in 
+  + congressional_district - the congressional district number that incident occured in 
+  + state - state that incident occured in 
+  + city_or_county - city or county that incident occured in
+  + gun_stolen - if gun was stolen
+  + gun_type - what type of gun was used 
+  + incident_characteristics - notes/characteristics of incident 
+* Continuous variables:
+  + age - age of participant involved in incident 
+  + n_killed - number of people killed in incident
+  + n_injured - number of people ingured in incident
+  + n_guns_involed - number of guns involved in incident 
+  + latitude - latitude of incident 
+  + longitude - longitude of incident 
+  + date - date of incident occurence 
+
+***
+> How should we break up these variables?
+
+* Want to separate all these variables into separate tables, that make sense together
+  + separating the tables will not only help us clean up our data, but also makes it easier to analyze as the variables are grouped together
+* Want to keep incident id in every table in order to ensure we can connect the tables to one another in the future
+
+### Tables
+1. Participant_Info
+ + incident_id"           
+ + "participant_name"      
+ + "participant_age"       
+ + "participant_age_group"
+ + "participant_gender" 
+2. Participante_Incident_Info
+  + "incident_id"        
+  + "participant_name"   
+  + "participant_status" 
+  + "participant_type" 
+3. Gun_Info
+  + "incident_id"      
+  + "participant_name" 
+  + "gun_stolen"       
+  + "gun_type" 
+4. Incident_Stats
+  + "incident_id"     
+  + "date"            
+  + "state"           
+  + "city_or_county"  
+  + "latitude"       
+  + "longitude"       
+  + "n_killed"        
+  + "n_guns_involved" 
+  + "n_injured" 
+5. Incident_Government_Info
+  + "incident_id"            
+  + "state_house_district"   
+  + "state_senate_district" 
+  + "congressional_district"
+6. Incident_Characteristics
+  + "incident_id"              
+  + "incident_characteristics"
+  
+***
+## 1. Install Packages and Include Libraries 
+* We want to install the following packages for libraries that we will be using throughout the project
+```{r}
+install.packages("tidyverse", repos="http://cran.us.r-project.org") #data wrangling 
+install.packages("dplyr", repos="http://cran.us.r-project.org")     #data wrangling
+install.packages("lubridate", repos="http://cran.us.r-project.org") #date transforming
+install.packages("ggplot2", repos="http://cran.us.r-project.org")   #graphs, plots, visualizations
+install.packages("usmap", repos="http://cran.us.r-project.org")     #usa map visualization 
+install.packages("reshape2", repos="http://cran.us.r-project.org")  #used to reshape data frames 
+
+#load necessary libraries 
+library("tidyverse")
+library("dplyr")
+library("lubridate")
+library("ggplot2")
+library("usmap")
+library(reshape2)
+
+```
+
+## 2. Load Data 
+* Download the dataset from https://www.kaggle.com/jameslko/gun-violence-data and store it in the same directory in order to load it
+```{r}
+gun_violence <- read_csv("./gun-violence-data_01-2013_03-2018.csv")
+```
+
+## Tidy Data
+* We will begin cleaning our data by separating the variables into different tables 
+
+> First we will make our Participant_Info table
+
+```{r}
+Participant_Info <- tibble(
+  incident_id=gun_violence$incident_id,
+  participant_name=gun_violence$participant_name,
+  participant_age=gun_violence$participant_age,
+  participant_age_group=gun_violence$participant_age_group,
+  participant_gender=gun_violence$participant_gender)
+
+head(Participant_Info)
+```
+* As you can see the data is not cleaned and uses each observation as a single incident that holds many variables that are mapped to eachother
+* The observations are mapped to one another in the following formats:
+  + <some number>::{data we care about}||<next number>::{data we care about} and so on...
+  + <some number>:{data we care about}|| 
+  + <some number>::{data we care about}|
+* In order to clean this up, we should:
+  + First, we separate the rows by "||"
+  + Then, we match the rows together by their corresponding number "<some number>::"
+  + Lastly, we take out the mappings: "<some number>::"
+```{r}
+#separate rows & match mappings
+Participant_Info <- Participant_Info %>%
+  separate_rows(participant_name, sep="\\|\\|", convert=TRUE)
+
+Participant_Info <- Participant_Info %>%
+  separate_rows(participant_age, sep="\\|\\|", convert=TRUE)
+
+Participant_Info <- subset(Participant_Info, substr(participant_name, 0, 1)==substr(participant_age, 0, 1))
+
+Participant_Info <- Participant_Info %>%
+  separate_rows(participant_age_group, sep="\\|\\|", convert=TRUE)
+Participant_Info <- Participant_Info %>%
+  separate_rows(participant_age_group, sep="\\|", convert=TRUE)
+
+Participant_Info <- subset(Participant_Info, substr(participant_name, 0, 1)==substr(participant_age_group, 0, 1))
+
+Participant_Info <- Participant_Info %>%
+  separate_rows(participant_gender, sep="\\|\\|", convert=TRUE)
+Participant_Info <- Participant_Info %>%
+  separate_rows(participant_gender, sep="\\|", convert=TRUE)
+
+Participant_Info <- subset(Participant_Info, substr(participant_name, 0, 1)==substr(participant_gender, 0, 1))
+
+
+#take out mappings
+Participant_Info$participant_name <- gsub("^\\d+::", "", Participant_Info$participant_name)
+Participant_Info$participant_age <- gsub("^\\d+::", "", Participant_Info$participant_age)
+Participant_Info$participant_age_group <- gsub("^\\d+::", "", Participant_Info$participant_age_group)
+Participant_Info$participant_gender <- gsub("^\\d+::", "", Participant_Info$participant_gender)
+Participant_Info$participant_age_group <- gsub("^\\d+:", "", Participant_Info$participant_age_group)
+Participant_Info$participant_gender <- gsub("^\\d+:", "", Participant_Info$participant_gender)
+```
+* I want to note here that as we have separated the rows, the incident_id is no longer unique and has multiple instances 
+* The last step for this table is the factor together the categorical variables
+  + Factoring will group together categorical variables into levels
+  + This will help us view and analyze the data 
+* I also want to make sure that the age is numeric
+  + Since the data was read in as a string, we want to ensure that the age is numeric, now that we have cleaned it up
+```{r}
+#convert factor 
+Participant_Info$participant_age_group <- as.factor(Participant_Info$participant_age_group)
+Participant_Info$participant_gender <- as.factor(Participant_Info$participant_gender)
+Participant_Info$incident_id <- as.factor(Participant_Info$incident_id)
+
+#make sure that age is numeric and not categorical 
+Participant_Info$participant_age <- as.numeric(Participant_Info$participant_age)
+
+head(Participant_Info)
+```
+
+> Next we will make our Participant_Incident_Info table
+
+```{r}
+Participant_Incident_Info <- tibble(
+  incident_id=gun_violence$incident_id,
+  participant_name=gun_violence$participant_name,
+  participant_status=gun_violence$participant_status,
+  participant_type=gun_violence$participant_type)
+
+head(Participant_Incident_Info)
+```
+* As you can see the data is not cleaned and uses each observation as a single incident that holds many variables that are mapped to eachother, *just like our Participant_Info table*
+* The observations are mapped to one another in the following formats:
+  + <some number>::{data we care about}||<next number>::{data we care about} and so on...
+  + <some number>:{data we care about}|| 
+  + <some number>::{data we care about}|
+* In order to clean this up, we should:
+  + First, we separate the rows by "||"
+  + Then, we match the rows together by their corresponding number "<some number>::"
+  + Lastly, we take out the mappings: "<some number>::"
+```{r}
+#separate rows & match mappings
+Participant_Incident_Info <- Participant_Incident_Info %>%
+  separate_rows(participant_name, sep="\\|\\|", convert=TRUE)
+
+Participant_Incident_Info <- Participant_Incident_Info %>%
+  separate_rows(participant_status, sep="\\|\\|", convert=TRUE)
+Participant_Incident_Info <- Participant_Incident_Info %>%
+  separate_rows(participant_status, sep="\\|", convert=TRUE)
+
+Participant_Incident_Info <- subset(Participant_Incident_Info, substr(participant_name, 0, 1)==substr(participant_status, 0, 1))
+
+Participant_Incident_Info <- Participant_Incident_Info %>%
+  separate_rows(participant_type, sep="\\|\\|", convert=TRUE)
+Participant_Incident_Info <- Participant_Incident_Info %>%
+  separate_rows(participant_type, sep="\\|", convert=TRUE)
+
+Participant_Incident_Info <- subset(Participant_Incident_Info, substr(participant_name, 0, 1)==substr(participant_type, 0, 1))
+
+
+#take out mappings
+Participant_Incident_Info$participant_name <- gsub("^\\d+::", "", Participant_Incident_Info$participant_name)
+Participant_Incident_Info$participant_name <- gsub("^\\d+:", "", Participant_Incident_Info$participant_name)
+Participant_Incident_Info$participant_status <- gsub("^\\d+::", "", Participant_Incident_Info$participant_status)
+Participant_Incident_Info$participant_status <- gsub("^\\d+:", "", Participant_Incident_Info$participant_status)
+Participant_Incident_Info$participant_type <- gsub("^\\d+::", "", Participant_Incident_Info$participant_type)
+Participant_Incident_Info$participant_type <- gsub("^\\d+:", "", Participant_Incident_Info$participant_type)
+```
+* I want to note here that as we have separated the rows, the incident_id is no longer unique and has multiple instances 
+* The last step for this table is the factor together the categorical variables
+  + Factoring will group together categorical variables into levels
+  + This will help us view and analyze the data 
+```{r}
+#convert to factor
+Participant_Incident_Info$participant_status <- as.factor(Participant_Incident_Info$participant_status)
+Participant_Incident_Info$participant_type <- as.factor(Participant_Incident_Info$participant_type)
+Participant_Incident_Info$incident_id <- as.factor(Participant_Incident_Info$incident_id)
+
+head(Participant_Incident_Info)
+```
+
+> Now we will make our Gun_Info Table
+
+```{r}
+Gun_Info <- tibble(
+  incident_id=gun_violence$incident_id,
+  participant_name=gun_violence$participant_name,
+  gun_stolen=gun_violence$gun_stolen,
+  gun_type=gun_violence$gun_type)
+
+head(Gun_Info)
+```
+* As you can see the data is not cleaned and uses each observation as a single incident that holds many variables that are mapped to eachother, *just like our previous two tables*
+* The observations are mapped to one another in the following formats:
+  + <some number>::{data we care about}||<next number>::{data we care about} and so on...
+  + <some number>:{data we care about}|| 
+  + <some number>::{data we care about}|
+* In order to clean this up, we should:
+  + First, we separate the rows by "||"
+  + Then, we match the rows together by their corresponding number "<some number>::"
+  + Lastly, we take out the mappings: "<some number>::"
+```{r}
+#separate rows & match mappings
+Gun_Info <- Gun_Info %>%
+  separate_rows(participant_name, sep="\\|\\|", convert=TRUE)
+
+Gun_Info <- Gun_Info %>%
+  separate_rows(gun_stolen, sep="\\|\\|", convert=TRUE)
+Gun_Info <- Gun_Info %>%
+  separate_rows(gun_stolen, sep="\\|", convert=TRUE)
+
+Gun_Info <- subset(Gun_Info, substr(participant_name, 0, 1)==substr(gun_stolen, 0, 1))
+
+Gun_Info <- Gun_Info %>%
+  separate_rows(gun_type, sep="\\|\\|", convert=TRUE)
+
+Gun_Info <- subset(Gun_Info, substr(participant_name, 0, 1)==substr(gun_type, 0, 1))
+#remove mappings
+Gun_Info$participant_name <- gsub("^\\d+::", "", Gun_Info$participant_name)
+Gun_Info$gun_stolen <- gsub("^\\d+::", "", Gun_Info$gun_stolen)
+Gun_Info$gun_stolen <- gsub("^\\d+:", "", Gun_Info$gun_stolen)
+Gun_Info$gun_type <- gsub("^\\d+::", "", Gun_Info$gun_type)
+Gun_Info$gun_type <- gsub("^\\d+:", "", Gun_Info$gun_type)
+```
+* I want to note here that as we have separated the rows, the incident_id is no longer unique and has multiple instances 
+* The last step for this table is the factor together the categorical variables
+  + Factoring will group together categorical variables into levels
+  + This will help us view and analyze the data 
+```{r}
+#conver to factor 
+Gun_Info$gun_stolen <- as.factor(Gun_Info$gun_stolen)
+Gun_Info$gun_type <- as.factor(Gun_Info$gun_type)
+Gun_Info$incident_id <- as.factor(Gun_Info$incident_id)
+
+head(Gun_Info)
+```
+> Next we will make our Incident_Stats Table
+
+```{r}
+Incident_Stats <- tibble(
+  incident_id=gun_violence$incident_id,
+  date=gun_violence$date,
+  state=gun_violence$state,
+  city_or_county=gun_violence$city_or_county,
+  latitude=gun_violence$latitude,
+  longitude=gun_violence$longitude,
+  n_killed=gun_violence$n_killed,
+  n_guns_involved=gun_violence$n_guns_involved,
+  n_injured=gun_violence$n_injured)
+
+head(Incident_Stats)
+```
+* Here I want to convert the date to a format that R can recogize as date
+  + This will make it easier to manipulate and analyze 
+  + We will use the POSIXlt function to convert the date 
+* We also want to convert the id to a character (not a factor)
+  + I want to note here that since we did not separate the rows, the incident id will be unique in tihs table
+* Lastly, we will convert the state to a factor 
+  + Factoring will group together categorical variables into levels
+  + This will help us view and analyze the data 
+```{r}
+Incident_Stats$date<- as.POSIXlt(parse_datetime(as.character(Incident_Stats$date), format="%Y-%m-%d"))
+
+#need to make incident id categorical
+Incident_Stats$incident_id <- as.character(Incident_Stats$incident_id)
+#convert state to factor 
+Incident_Stats$state <- as.factor(Incident_Stats$state)
+
+head(Incident_Stats)
+```
+> Now we will create our Incident_Government_Info Table
+
+```{r}
+Incident_Government_Info <- tibble(
+  incident_id=gun_violence$incident_id,
+  state_house_district=gun_violence$state_house_district,
+  state_senate_district=gun_violence$state_senate_district,
+  congressional_district=gun_violence$congressional_district)
+```
+* We also want to convert the id to a character (not a factor)
+  + I want to note here that since we did not separate the rows, the incident id will be unique in tihs table
+* Lastly, we will convert the house, senate, congressional districts to factor
+  + Although the districts are numeric, they represent a specific district, therefore making it categorical
+  + Factoring will group together categorical variables into levels
+  + This will help us view and analyze the data 
+```{r}
+#need to make incident id categorical
+Incident_Government_Info$incident_id <- as.character(Incident_Government_Info$incident_id)
+Incident_Government_Info$state_house_district<- as.factor(Incident_Government_Info$state_house_district)
+Incident_Government_Info$state_senate_district <- as.factor(Incident_Government_Info$state_senate_district)
+Incident_Government_Info$congressional_district <- as.factor(Incident_Government_Info$congressional_district)
+
+head(Incident_Government_Info)
+```
+> Lastly, we will make our Incident_Characteristics table 
+
+```{r}
+Incident_Characteristics <- tibble(
+  incident_id=gun_violence$incident_id,
+  incident_characteristics=gun_violence$incident_characteristics)
+
+head(Incident_Characteristics)
+```
+* As you can see the data is not cleaned and uses each observation as a single incident that holds many variables
+* The observations are mapped to one another in the following format:
+  + {data we care about}||
+* We separate the rows by "||"
+```{r}
+Incident_Characteristics <- Incident_Characteristics %>%
+  separate_rows(incident_characteristics, sep="\\|\\|", convert=TRUE)
+```
+* I want to note here that as we have separated the rows, the incident_id is no longer unique and has multiple instances 
+* The last step for this table is the factor together the categorical variables
+  + Factoring will group together categorical variables into levels
+  + This will help us view and analyze the data 
+```{r}
+#convert to factor
+Incident_Characteristics$incident_id <- as.factor(Incident_Characteristics$incident_id)
+Incident_Characteristics$incident_characteristics<- as.factor(Incident_Characteristics$incident_characteristics)
+
+head(Incident_Characteristics)
+```
+
+## 3. Visualizations & Statistics 
+```{r}
+summary(Participant_Info)
+```
+
+```{r}
+summary(Participant_Incident_Info)
+```
+
+```{r}
+summary(Gun_Info)
+```
+
+```{r}
+summary(Incident_Stats)
+```
+
+```{r}
+summary(Incident_Government_Info)
+```
+
+```{r}
+summary(Incident_Characteristics)
+```
+
+##Visualizations 
+
+## Exploring our Incident_Stats
+#Count per Year
+```{r}
+year <- table(year=year(Incident_Stats$date))
+barplot(year, main="Incidents per Year", xlab="Year", col="#785EF0")
+```
+
+#Average counts per month per year
+```{r}
+df <- data.frame(date=Incident_Stats$date)
+df$month <- month(df$date)
+df$year <- year(df$date)
+
+df$year <- as.factor(df$year)
+count <- df %>% 
+  group_by(year) %>% 
+  count(month) %>% 
+  group_by(month) %>% 
+  summarise(mean=mean(n))
+count$month <- as.factor(count$month)
+
+ggplot(count, aes(x=month, y=mean)) + 
+  geom_bar(stat="identity",fill="#648FFF" ) + 
+  labs(x="Month", y="Mean")+
+  ggtitle("Average Incidents per Month")+
+  scale_x_discrete(labels=c("January","Februrary","March","April","May","June","July","August","September","October","November","December"))+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5), 
+        plot.title = element_text(hjust=0.5))
+```
+
+# Map of incidents per state
+```{r}
+UsaMap <- Incident_Stats
+UsaMap <- UsaMap %>% count(state)
+UsaMap
+plot_usmap(data = UsaMap, values = "n", color = "white") + 
+  scale_fill_continuous(
+    low = "white", high = "#FE6100",name = "Incident Count", label = scales::comma
+  ) + theme(legend.position = "right")
+```
+
+## Participant Incident Info
+# Time Series 
+
+```{r}
+Stats_Total <- Incident_Stats
+Stats_Total$date <- ymd(Stats_Total$date)
+Stats_Total$n_injured <- as.numeric(Stats_Total$n_injured)
+Stats_Total$n_killed <- as.numeric(Stats_Total$n_killed)
+Stats_Total$total <- Stats_Total$n_injured + Stats_Total$n_killed
+Stats_Total <- Stats_Total %>% filter(total > 0)
+totals <- data.frame(total=Stats_Total$total, injured=Stats_Total$n_injured, killed=Stats_Total$n_killed, date=Stats_Total$date)
+melted_totals <- melt(totals, measure.vars = c("total","killed","injured"))
+
+head(melted_totals)
+
+ggplot() + 
+  geom_line(data=melted_totals, aes(x=date, y=value, colour=variable)) + 
+  scale_color_manual(values=c("#785EF0", "#DC267F", "#FFB000" )) +
+  xlab("Date") +
+  ylab("Value") +
+  ggtitle("Killed or Injured over Time > 0") +
+  theme(plot.title = element_text(hjust=0.5))
+```
+```{r}
+#ugly lets limit it
+Stats_Total <- Stats_Total %>% filter(total > 10)
+totals <- data.frame(total=Stats_Total$total, injured=Stats_Total$n_injured, killed=Stats_Total$n_killed, date=Stats_Total$date)
+melted_totals <- melt(totals, measure.vars = c("total","killed","injured"))
+
+head(melted_totals)
+
+ggplot() + 
+  geom_line(data=melted_totals, aes(x=date, y=value, colour=variable)) + 
+  scale_color_manual(values=c("#785EF0", "#DC267F", "#FFB000" )) +
+  xlab("Date") +
+  ylab("Value") +
+  ggtitle("Killed or Injured over Time > 0") +
+  theme(plot.title = element_text(hjust=0.5))
+
+```
+## Gun_Info
+```{r}
+Gun_Info_Type_Count <- Gun_Info %>% count(gun_type)
+Gun_Info_Type_Count <- Gun_Info_Type_Count %>% filter(n > 150)
+ggplot(Gun_Info_Type_Count, aes(x=gun_type, y=n)) + 
+  geom_bar(stat="identity", fill="#DC267F") + 
+  labs(x="Type", y="Count")+
+  ggtitle("Count of Gun Types > 150")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5), plot.title = element_text(hjust=0.5))
+```
+
+```{r}
+Gun_Info_Stolen_Count <- Gun_Info %>% count(gun_stolen)
+ggplot(Gun_Info_Stolen_Count, aes(x=gun_stolen, y=n)) + 
+  geom_bar(stat="identity", fill="#FFB000") + 
+  labs(x="Gun Type", y="Count")+
+  ggtitle("Count of Types of Guns")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5), plot.title = element_text(hjust=0.5))
+```
+
+## Participant Info
+```{r}
+Participant_AgeGroup_Count <- Participant_Info %>% count(participant_age_group)
+ggplot(Participant_AgeGroup_Count , aes(x=participant_age_group, y=n)) + 
+  geom_bar(stat="identity", fill="#FE6100") + 
+  labs(x="Age", y="Count")+
+  ggtitle("Participant Age Groups")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5), plot.title = element_text(hjust=0.5))
+```
+
+## Incident Characteristics
+```{r}
+Incident_Characteristics_Count <- Incident_Characteristics %>% count(incident_characteristics)
+Incident_Characteristics_Count <- Incident_Characteristics_Count %>% filter(n > 10000)
+ggplot(Incident_Characteristics_Count , aes(x=incident_characteristics, y=n)) + 
+  geom_bar(stat="identity", fill="#648FFF") + 
+  labs(x="Characteristics", y="Count")+
+  ggtitle("Incident Characteristics > 10,000")+
+  coord_flip()+
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+# Merging Participant tables may be useful later when doing visualisations and analyzing 
+* The merge takes around 5-10 minutes to complete since the data is so large
+```{r}
+#Participant <- merge(Participant_Info, Participant_Incident_Info, by=c("incident_id", "participant_name"))
+```
