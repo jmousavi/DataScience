@@ -11,10 +11,11 @@ output: html_document
 Recently I have noticed many gun violence incidents. It is to the point where there have been more incidents than there have been days in this year. Hearing about such violences that happen every day makes this country immune to this type of news, when it should be taken more seriously. 
 
 I am interested in seeing trends that exist in gun violience and discover if there are any ways to predict or lessen such violences. I know that twitter has the ability to predict social unrest, and would be interested in finding out if such violences could be predicted through analyzing social media content.
+
 ***
 > What Dataset am I using?
 
-* I found gun violence dataset on kaggle: https://www.kaggle.com/jameslko/gun-violence-data 
+* I found a gun violence dataset on kaggle: https://www.kaggle.com/jameslko/gun-violence-data 
   + This dataset spans from January 2013 to March 2018
   + This dataset contains over 260k observations
   + This dataset contains 29 variables
@@ -24,11 +25,14 @@ I am interested in seeing trends that exist in gun violience and discover if the
   + Trusting the user wrote a proper web scraper
   + Trusting gunviolencearchive.org
   + Since gunviolencearchive.org gathers its data from news articles, then we would also have to trust that the articles are reporting accurately
+  + Human biases within the data through news corruption or police discrimination 
+  + Assuming that this is truly all the data on gun violence that occured from January 2013 - March 2018
   
 ***
 > What variables am I using?
 
-Although the dataset has 29 variables I am only using 
+Although the dataset has 29 variables I am only using 20 variables 
+
 * Categorical variables:
   + incident_id - unique identifier for each incident 
   + participant_name - the name of the participant involved in the incident 
@@ -100,12 +104,14 @@ Although the dataset has 29 variables I am only using
 ## 1. Install Packages and Include Libraries 
 * We want to install the following packages for libraries that we will be using throughout the project
 ```{r}
-install.packages("tidyverse", repos="http://cran.us.r-project.org") #data wrangling 
-install.packages("dplyr", repos="http://cran.us.r-project.org")     #data wrangling
-install.packages("lubridate", repos="http://cran.us.r-project.org") #date transforming
-install.packages("ggplot2", repos="http://cran.us.r-project.org")   #graphs, plots, visualizations
-install.packages("usmap", repos="http://cran.us.r-project.org")     #usa map visualization 
-install.packages("reshape2", repos="http://cran.us.r-project.org")  #used to reshape data frames 
+install.packages("tidyverse", repos="http://cran.us.r-project.org")  #data wrangling 
+install.packages("dplyr", repos="http://cran.us.r-project.org")      #data wrangling
+install.packages("lubridate", repos="http://cran.us.r-project.org")  #date transforming
+install.packages("ggplot2", repos="http://cran.us.r-project.org")    #graphs, plots, visualizations
+install.packages("usmap", repos="http://cran.us.r-project.org")      #usa map visualization 
+install.packages("reshape2", repos="http://cran.us.r-project.org")   #used to reshape data frames 
+# If you are using mac, you will need to install XQuarts on your machine: https://www.xquartz.org/
+install.packages("summarytools", repos="http://cran.us.r-project.org") #used to describe data frames 
 
 #load necessary libraries 
 library("tidyverse")
@@ -114,21 +120,25 @@ library("lubridate")
 library("ggplot2")
 library("usmap")
 library(reshape2)
-
+library(summarytools)
+library(knitr)
 ```
-
+***
 ## 2. Load Data 
 * Download the dataset from https://www.kaggle.com/jameslko/gun-violence-data and store it in the same directory in order to load it
 ```{r}
 gun_violence <- read_csv("./gun-violence-data_01-2013_03-2018.csv")
 ```
+***
+## 3. Tidy Data
+* We will begin cleaning our data by separating the variables into different tables. 
+* Separating data into different tables allows us to group together variables that make sense together, also making our data easier to understand.
+* We also need to make sure our variables are converted to the correct format (numbers should be numbers, dates should be dates, strings should be strings, etc.)
 
-## Tidy Data
-* We will begin cleaning our data by separating the variables into different tables 
-
-> First we will make our Participant_Info table
+> Creating the Participant_Info table
 
 ```{r}
+#make tibble of selected variables 
 Participant_Info <- tibble(
   incident_id=gun_violence$incident_id,
   participant_name=gun_violence$participant_name,
@@ -140,9 +150,9 @@ head(Participant_Info)
 ```
 * As you can see the data is not cleaned and uses each observation as a single incident that holds many variables that are mapped to eachother
 * The observations are mapped to one another in the following formats:
-  + <some number>::{data we care about}||<next number>::{data we care about} and so on...
-  + <some number>:{data we care about}|| 
-  + <some number>::{data we care about}|
+  + (some number)::{data we care about}||<next number>::{data we care about} and so on...
+  + (some number):{data we care about}|| 
+  + (some number)::{data we care about}|
 * In order to clean this up, we should:
   + First, we separate the rows by "||"
   + Then, we match the rows together by their corresponding number "<some number>::"
@@ -198,9 +208,10 @@ Participant_Info$participant_age <- as.numeric(Participant_Info$participant_age)
 head(Participant_Info)
 ```
 
-> Next we will make our Participant_Incident_Info table
+> Creating the Participant_Incident_Info table
 
 ```{r}
+#make tibble of selected variables 
 Participant_Incident_Info <- tibble(
   incident_id=gun_violence$incident_id,
   participant_name=gun_violence$participant_name,
@@ -211,9 +222,9 @@ head(Participant_Incident_Info)
 ```
 * As you can see the data is not cleaned and uses each observation as a single incident that holds many variables that are mapped to eachother, *just like our Participant_Info table*
 * The observations are mapped to one another in the following formats:
-  + <some number>::{data we care about}||<next number>::{data we care about} and so on...
-  + <some number>:{data we care about}|| 
-  + <some number>::{data we care about}|
+  + (some number)::{data we care about}||<next number>::{data we care about} and so on...
+  + (some number):{data we care about}|| 
+  + (some number)::{data we care about}|
 * In order to clean this up, we should:
   + First, we separate the rows by "||"
   + Then, we match the rows together by their corresponding number "<some number>::"
@@ -259,9 +270,10 @@ Participant_Incident_Info$incident_id <- as.factor(Participant_Incident_Info$inc
 head(Participant_Incident_Info)
 ```
 
-> Now we will make our Gun_Info Table
+> Creating the Gun_Info Table
 
 ```{r}
+#make tibble of selected variables 
 Gun_Info <- tibble(
   incident_id=gun_violence$incident_id,
   participant_name=gun_violence$participant_name,
@@ -272,9 +284,9 @@ head(Gun_Info)
 ```
 * As you can see the data is not cleaned and uses each observation as a single incident that holds many variables that are mapped to eachother, *just like our previous two tables*
 * The observations are mapped to one another in the following formats:
-  + <some number>::{data we care about}||<next number>::{data we care about} and so on...
-  + <some number>:{data we care about}|| 
-  + <some number>::{data we care about}|
+  + (some number)::{data we care about}||<next number>::{data we care about} and so on...
+  + (some number):{data we care about}|| 
+  + (some number)::{data we care about}|
 * In order to clean this up, we should:
   + First, we separate the rows by "||"
   + Then, we match the rows together by their corresponding number "<some number>::"
@@ -307,16 +319,17 @@ Gun_Info$gun_type <- gsub("^\\d+:", "", Gun_Info$gun_type)
   + Factoring will group together categorical variables into levels
   + This will help us view and analyze the data 
 ```{r}
-#conver to factor 
+#convert to factor 
 Gun_Info$gun_stolen <- as.factor(Gun_Info$gun_stolen)
 Gun_Info$gun_type <- as.factor(Gun_Info$gun_type)
 Gun_Info$incident_id <- as.factor(Gun_Info$incident_id)
 
 head(Gun_Info)
 ```
-> Next we will make our Incident_Stats Table
+> Creating the Incident_Stats Table
 
 ```{r}
+#make tibble of selected variables 
 Incident_Stats <- tibble(
   incident_id=gun_violence$incident_id,
   date=gun_violence$date,
@@ -330,7 +343,7 @@ Incident_Stats <- tibble(
 
 head(Incident_Stats)
 ```
-* Here I want to convert the date to a format that R can recogize as date
+* Here I want to convert the date to a format that R can recognize as date
   + This will make it easier to manipulate and analyze 
   + We will use the POSIXlt function to convert the date 
 * We also want to convert the id to a character (not a factor)
@@ -345,17 +358,21 @@ Incident_Stats$date<- as.POSIXlt(parse_datetime(as.character(Incident_Stats$date
 Incident_Stats$incident_id <- as.character(Incident_Stats$incident_id)
 #convert state to factor 
 Incident_Stats$state <- as.factor(Incident_Stats$state)
+Incident_Stats$city_or_county <- as.factor(Incident_Stats$city_or_county)
 
 head(Incident_Stats)
 ```
-> Now we will create our Incident_Government_Info Table
+> Creating the Incident_Government_Info Table
 
 ```{r}
+#make tibble of selected variables 
 Incident_Government_Info <- tibble(
   incident_id=gun_violence$incident_id,
   state_house_district=gun_violence$state_house_district,
   state_senate_district=gun_violence$state_senate_district,
   congressional_district=gun_violence$congressional_district)
+
+head(Incident_Government_Info)
 ```
 * We also want to convert the id to a character (not a factor)
   + I want to note here that since we did not separate the rows, the incident id will be unique in tihs table
@@ -375,6 +392,7 @@ head(Incident_Government_Info)
 > Lastly, we will make our Incident_Characteristics table 
 
 ```{r}
+#make tibble of selected variables 
 Incident_Characteristics <- tibble(
   incident_id=gun_violence$incident_id,
   incident_characteristics=gun_violence$incident_characteristics)
@@ -386,6 +404,7 @@ head(Incident_Characteristics)
   + {data we care about}||
 * We separate the rows by "||"
 ```{r}
+#separate rows 
 Incident_Characteristics <- Incident_Characteristics %>%
   separate_rows(incident_characteristics, sep="\\|\\|", convert=TRUE)
 ```
@@ -400,55 +419,77 @@ Incident_Characteristics$incident_characteristics<- as.factor(Incident_Character
 
 head(Incident_Characteristics)
 ```
-
-## 3. Visualizations & Statistics 
+***
+## 4. Exploring our Data through Visualizations and Statistics 
+First, we will set our summarytools settings
 ```{r}
-summary(Participant_Info)
+st_options(bootstrap.css     = FALSE,       # Already part of the theme so no need for it
+           plain.ascii       = FALSE,       # One of the essential settings
+           style             = "rmarkdown", # Idem.
+           dfSummary.silent  = TRUE,        # Suppresses messages about temporary files
+           footnote          = NA,          # Keeping the results minimalistic
+           subtitle.emphasis = FALSE)       # For the vignette theme, this gives
+                                            # much better results. Your mileage may vary.
+opts_chunk$set(comment=NA, prompt=FALSE, cache=FALSE, echo=TRUE, results='asis') #kniter options
+st_css() #css for summarytools
 ```
 
+### Exploring our Incident_Government_Info Table
+First, lets look at a quick summary of our table
 ```{r}
-summary(Participant_Incident_Info)
+dfSummary(Incident_Government_Info, style="grid", graph.col=FALSE, max.distinct.values=5, valid.col=FALSE)
 ```
 
+Now lets take a closer look at the most frequent variables in the house, senate, and congress districts
 ```{r}
-summary(Gun_Info)
+freq(Incident_Government_Info$state_house_district, plain.ascii = FALSE, style = "rmarkdown", order="freq", rows=1:5)
+freq(Incident_Government_Info$state_senate_district, plain.ascii = FALSE, style = "rmarkdown", order="freq", rows=1:5)
+freq(Incident_Government_Info$congressional_district, plain.ascii = FALSE, style = "rmarkdown", order="freq", rows=1:5)
 ```
+* The house district with the most incidents is district 18.
+* The senate district with the most incidents is district 5.
+* The congressional district with the most incidents is district 1.
 
+### Exploring our Incident_Stats table
+First, lets take a look at a summary of our table
 ```{r}
-summary(Incident_Stats)
+incident_stats <- Incident_Stats
+incident_stats$date <- ymd(incident_stats$date)  #need to format of date in order to work with dfSummary()
+dfSummary(incident_stats, style="grid", graph.col=FALSE, max.distinct.values=5, valid.col=FALSE)
+summary(incident_stats)
 ```
+Now lets take a closer look at some of our variables to answer some questions
+> How many incidents do we have each year?
 
 ```{r}
-summary(Incident_Government_Info)
-```
+year <- table(year=year(Incident_Stats$date)) #create data frame that separates the year
 
-```{r}
-summary(Incident_Characteristics)
-```
-
-##Visualizations 
-
-## Exploring our Incident_Stats
-#Count per Year
-```{r}
-year <- table(year=year(Incident_Stats$date))
+#Plot the data
 barplot(year, main="Incidents per Year", xlab="Year", col="#785EF0")
 ```
+* 2017 has the most incidents, followed by 2016.
+* One thing to note here is that the dataset does not include the all the months of 2018.
+* However, 2013 is strangely low, and it is something we should take a closer look at in the future. 
+  + Perhaps not all the months are in the dataset (as the should be), or maybe the python script didn't get all the observations. 
+  
+> What is the average incidents per month?
 
-#Average counts per month per year
 ```{r}
+#create a data frame that separates the year, month, and day from the date
 df <- data.frame(date=Incident_Stats$date)
 df$month <- month(df$date)
 df$year <- year(df$date)
 
+#group together by year, month, and day
 df$year <- as.factor(df$year)
 count <- df %>% 
   group_by(year) %>% 
   count(month) %>% 
   group_by(month) %>% 
-  summarise(mean=mean(n))
-count$month <- as.factor(count$month)
+  summarise(mean=mean(n)) #gather the means of the groups
+count$month <- as.factor(count$month) #group together the months into categories/levels
 
+#Plot the data
 ggplot(count, aes(x=month, y=mean)) + 
   geom_bar(stat="identity",fill="#648FFF" ) + 
   labs(x="Month", y="Mean")+
@@ -458,32 +499,49 @@ ggplot(count, aes(x=month, y=mean)) +
         plot.title = element_text(hjust=0.5))
 ```
 
-# Map of incidents per state
+
+* July and August have the highest incidents per month
+
+> What states have the most incidents?
+
+
 ```{r}
 UsaMap <- Incident_Stats
-UsaMap <- UsaMap %>% count(state)
+UsaMap <- UsaMap %>% count(state)  # create a data frame of the counts per state
+UsaMap$state <- as.factor(UsaMap$state)
 UsaMap
-plot_usmap(data = UsaMap, values = "n", color = "white") + 
+#Plot the data
+plot_usmap(data = UsaMap, values = "n", color = "#FE6100") + 
   scale_fill_continuous(
-    low = "white", high = "#FE6100",name = "Incident Count", label = scales::comma
+    low = "white", high = "#FE6100", name = "Incidents in the USA", label = scales::comma
   ) + theme(legend.position = "right")
 ```
 
-## Participant Incident Info
-# Time Series 
+
+* Illinois, California, and Texas have the most incidents 
+
+> How many people were killed or injured for the incidents throughout the years?
 
 ```{r}
 Stats_Total <- Incident_Stats
-Stats_Total$date <- ymd(Stats_Total$date)
-Stats_Total$n_injured <- as.numeric(Stats_Total$n_injured)
-Stats_Total$n_killed <- as.numeric(Stats_Total$n_killed)
-Stats_Total$total <- Stats_Total$n_injured + Stats_Total$n_killed
-Stats_Total <- Stats_Total %>% filter(total > 0)
-totals <- data.frame(total=Stats_Total$total, injured=Stats_Total$n_injured, killed=Stats_Total$n_killed, date=Stats_Total$date)
-melted_totals <- melt(totals, measure.vars = c("total","killed","injured"))
+Stats_Total$date <- ymd(Stats_Total$date) #change the date format to work better with our graph
+Stats_Total$n_injured <- as.numeric(Stats_Total$n_injured) #need to make sure this is numeric in order to obtain total later
+Stats_Total$n_killed <- as.numeric(Stats_Total$n_killed) #need to make sure this is numeric in order to obtain total
+Stats_Total$total <- Stats_Total$n_injured + Stats_Total$n_killed #get the total
+
+totals <- data.frame(total=Stats_Total$total, 
+                     injured=Stats_Total$n_injured, 
+                     killed=Stats_Total$n_killed, 
+                     date=Stats_Total$date) #create new data frame to reshape 
+
+# reshape data frame in order to have the columns as rows, and also have a column for the frequencies of each variable
+melted_totals <- melt(totals, measure.vars = c("total","killed","injured")) 
 
 head(melted_totals)
-
+```
+* The reshaped data frame will be easier to graph
+```{r}
+#Plot the data
 ggplot() + 
   geom_line(data=melted_totals, aes(x=date, y=value, colour=variable)) + 
   scale_color_manual(values=c("#785EF0", "#DC267F", "#FFB000" )) +
@@ -492,36 +550,66 @@ ggplot() +
   ggtitle("Killed or Injured over Time > 0") +
   theme(plot.title = element_text(hjust=0.5))
 ```
+
+
+* This is graph is ugly and hard to interperet, so lets limit our total amount of injured/killed to 10 or greater
 ```{r}
 #ugly lets limit it
-Stats_Total <- Stats_Total %>% filter(total > 10)
-totals <- data.frame(total=Stats_Total$total, injured=Stats_Total$n_injured, killed=Stats_Total$n_killed, date=Stats_Total$date)
+Stats_Total <- Stats_Total %>% filter(total > 10) #filter total to be greater than 10
+
+totals <- data.frame(total=Stats_Total$total, 
+                     injured=Stats_Total$n_injured, 
+                     killed=Stats_Total$n_killed, 
+                     date=Stats_Total$date) #create new data frame to reshape 
+
+# reshape data frame in order to have the columns as rows, and also have a column for the frequencies of each variable
 melted_totals <- melt(totals, measure.vars = c("total","killed","injured"))
 
-head(melted_totals)
-
+#Plot the data
 ggplot() + 
   geom_line(data=melted_totals, aes(x=date, y=value, colour=variable)) + 
   scale_color_manual(values=c("#785EF0", "#DC267F", "#FFB000" )) +
   xlab("Date") +
   ylab("Value") +
-  ggtitle("Killed or Injured over Time > 0") +
+  ggtitle("Killed or Injured over Time > 10") +
   theme(plot.title = element_text(hjust=0.5))
 
 ```
-## Gun_Info
+
+
+* Here we can see there was a huge spike in 2016, and a small spike in 2017
+  + This is something we should investigate in the future
+
+### Exploring our Gun_Info table
+First, lets get a summary of 
 ```{r}
-Gun_Info_Type_Count <- Gun_Info %>% count(gun_type)
-Gun_Info_Type_Count <- Gun_Info_Type_Count %>% filter(n > 150)
+dfSummary(Gun_Info, style="grid", graph.col=FALSE, max.distinct.values=5, valid.col=FALSE)
+summary(Gun_Info)
+```
+Now lets take a closer look at some of our variables to answer some questions
+
+> What are the most common gun types?
+
+```{r}
+Gun_Info_Type_Count <- Gun_Info %>% count(gun_type) #create a data frame of the counts of types of guns
+#There are many different gun types, so we are going to only look at the gun types that occur more than 150 times
+Gun_Info_Type_Count <- Gun_Info_Type_Count %>% filter(n > 150) 
+
+#Plot the data
 ggplot(Gun_Info_Type_Count, aes(x=gun_type, y=n)) + 
   geom_bar(stat="identity", fill="#DC267F") + 
   labs(x="Type", y="Count")+
-  ggtitle("Count of Gun Types > 150")+
+  ggtitle("Count of Gun Types > 150") +
   theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5), plot.title = element_text(hjust=0.5))
 ```
+* Although there are many unknown gun types, the next most common is the handgun 
+
+> Are guns that are involved in incidents mostly stolen?
 
 ```{r}
-Gun_Info_Stolen_Count <- Gun_Info %>% count(gun_stolen)
+Gun_Info_Stolen_Count <- Gun_Info %>% count(gun_stolen) #Create a data frame of the gun stolen counts
+
+#Plot the data
 ggplot(Gun_Info_Stolen_Count, aes(x=gun_stolen, y=n)) + 
   geom_bar(stat="identity", fill="#FFB000") + 
   labs(x="Gun Type", y="Count")+
@@ -529,30 +617,106 @@ ggplot(Gun_Info_Stolen_Count, aes(x=gun_stolen, y=n)) +
   theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5), plot.title = element_text(hjust=0.5))
 ```
 
-## Participant Info
+
+* Once again the unknow amount is high, but it appears that guns involved in incidents are more likely to be stolen 
+
+### Exploring our Participant_Incident_Info table
+First, lets look at a summary of our data frame 
 ```{r}
-Participant_AgeGroup_Count <- Participant_Info %>% count(participant_age_group)
-ggplot(Participant_AgeGroup_Count , aes(x=participant_age_group, y=n)) + 
-  geom_bar(stat="identity", fill="#FE6100") + 
-  labs(x="Age", y="Count")+
+dfSummary(Participant_Incident_Info, style="grid", graph.col=FALSE, max.distinct.values=5, valid.col=FALSE)
+summary(Participant_Incident_Info)
+```
+Now, lets take a look at the frequencies of the variables participant_status and participant_type
+```{r}
+freq(Participant_Incident_Info$participant_status, plain.ascii = FALSE, style = "rmarkdown", order="freq", rows=1:5)
+freq(Participant_Incident_Info$participant_type, plain.ascii = FALSE, style = "rmarkdown", order="freq", rows=1:5)
+```
+* The most frequent participant status is 'Unharmed, Arrested', followed by 'Killed' 
+* The most frequent participant status is 'Subject-Suspect'
+  + This is interesting since I beleive there are more shooter victims then shooters. This makes me believe that the dataset does have some inconsistencies when obtaining all the participants involved in the incident. It is probably easier to obtain the suspect's name than all the victims involved(especially if they don't want to be in the news).
+
+### Exploring our Participant_Info table
+Lets first look at a summary of our table 
+```{r}
+dfSummary(Participant_Info, style="grid", graph.col=FALSE, max.distinct.values=5, valid.col=FALSE)
+summary(Participant_Info)
+```
+* The participant_age_group variable is mostly adults
+  + This matches up with the participate_age mean
+* We can see that the participats are mostly male 
+  + Males make up 81% of the participants
+  + Females make up 19% of the participants
+* We can see some issues with the participant_age variable
+  + There is a participant who's age is logged as 311, making this row 'dirty' and most likely an error 
+  + Lets investigate further to see if there are any other high ages within the dataset 
+```{r}
+head(sort(Participant_Info$participant_age, decreasing=TRUE), n=150) #view the top 150 sorted from greatest to least
+```
+* In my opinion 311-100 are unreasonably high, and can potentially be observations that have wrong values
+  + Even up to 89 seems quite high, this is something we can investigate further in the future
+  
+Now lets take a closer look at some of our variables to answer a question 
+
+> What is the gender percentage within each age group?
+
+```{r}
+grouped_participant <- Participant_Info %>%
+  group_by(participant_gender, participant_age_group) %>%
+  summarise(Count=n()) #group together gender and age group
+
+#Plot the data
+ggplot(grouped_participant, aes(x=participant_age_group, y=Count, fill=participant_gender)) + 
+  geom_bar(stat="identity", position="fill") + 
+  scale_fill_manual(values=c("#DC267F", "#648FFF")) +
+  labs(x="Age Group", y="Count")+
   ggtitle("Participant Age Groups")+
-  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5), plot.title = element_text(hjust=0.5))
+  theme(plot.title = element_text(hjust=0.5))
 ```
 
-## Incident Characteristics
+
+* It is interesting to note that the percent of males in the adult age group accurately depicts the overall male to female average. However, the child and teen age groups are signficantly different and have an closer to a 40% female to 60% male ratio.
+  + This could potentially be a trend
+  + Or this could be due to the fact that the percentage of teens and children in this dataset are relativley low in comparison to the percentage of adults
+  
+### Exploring our Incident_Characteristics table
+Lets first look at a summary of our table
+
 ```{r}
-Incident_Characteristics_Count <- Incident_Characteristics %>% count(incident_characteristics)
-Incident_Characteristics_Count <- Incident_Characteristics_Count %>% filter(n > 10000)
+dfSummary(Incident_Characteristics, style="grid", graph.col=FALSE, max.distinct.values=5, valid.col=FALSE)
+summary(Incident_Characteristics)
+```
+Now lets take a closer look at some of our variables to answer a question 
+
+> What are the most frequent characteristics>
+
+```{r}
+Incident_Characteristics_Count <- Incident_Characteristics %>% count(incident_characteristics) #creating a data frame of counts of each characteristic
+Incident_Characteristics_Count <- Incident_Characteristics_Count %>% filter(n > 10000) #Going to limit the characteristics that have counts greater than 10,000
+
+#Plot the data
 ggplot(Incident_Characteristics_Count , aes(x=incident_characteristics, y=n)) + 
-  geom_bar(stat="identity", fill="#648FFF") + 
+  geom_bar(stat="identity", fill="#FE6100") + 
   labs(x="Characteristics", y="Count")+
   ggtitle("Incident Characteristics > 10,000")+
   coord_flip()+
   theme(plot.title = element_text(hjust=0.5))
 ```
 
-# Merging Participant tables may be useful later when doing visualisations and analyzing 
-* The merge takes around 5-10 minutes to complete since the data is so large
-```{r}
-#Participant <- merge(Participant_Info, Participant_Incident_Info, by=c("incident_id", "participant_name"))
-```
+
+* The most frequent characteristic is 'Shot - wounded/injured' followed by 'Shot - dead'
+  + Shooting seems to be the most frequent 
+  + This makes sense since the dataset is related to gun violence 
+* The third most frequent characteristic is 'Non-Shooting Incident'
+  + This seems like an odd characteristic to be frequent
+  + We can look into this characteristic in the future
+
+***
+## 5. Research Quetsions
+
+1. How does the prevalence of gun violence in the United States vary from that of other countries? Many exhibit far few instances annually, what are the social, political and economic influences which make this the case? And how may these ideals be implemented to decrease rates of gun violence within the US?
+
+2. Claims made by organizations such as the National Rifle Association attribute the increasing rates of gun violence in the United States to violence in video games. Does a correlation between violent video games, and gun violence exist? Do other countries with similar video game playing trends experience gun violence at the same rate?
+
+3. Some argue that with the implementation of stricter gun laws, people would simply seek out other weapons. Considering countries which have enforced strict gun laws, was a difference in crime rates seen, an increase, decrease, or were the findings insignificant?
+
+Some social and ethical issues that come with this data are human biases and unfair discrimination. Human biases and discrimination can appear throught many different aspects of this data set. For example, when police officers are patrolling, arresting, or targeting citizens in some biased or discriminatory way. Building a model off biased data builds a biased model. Using such information to help improve our society can feed into the reinforcment of such biases, and may also lead to the improvement of select social groups or individuals. Using data from other countries as a proxy to make decisions for a different country can lead poor decision making. Although one model works for one country, that does not mean that the same model will work for another country. Models are not one size fits all, and it may not be possible to mitigate such biases and proxies in order to create a model that will work for all individuals in our society.
