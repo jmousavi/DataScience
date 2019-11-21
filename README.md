@@ -1,2 +1,2 @@
 # DataScience
-link(https://jmousavi.github.io/DataScience/)
+https://jmousavi.github.io/DataScience/
