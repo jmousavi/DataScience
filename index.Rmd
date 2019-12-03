@@ -1,0 +1,16 @@
+---
+title: "Data Science"
+author: "Jasmin Mousavi"
+date: "12/2/2019"
+output: html_document
+---
+
+## **Portfolio Project**
+***
+Recently I have noticed many gun violence incidents. It is to the point where there have been more incidents than there have been days in this year. Hearing about such violences that happen every day makes this country immune to this type of news, when it should be taken more seriously. 
+
+I clean and analyze data and create models in the following 3 pages:
+
+* [Part 1](P1.html) 
+* [Part 2](P2.html)
+* [Part 3](P3.html)

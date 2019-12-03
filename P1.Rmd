@@ -4,6 +4,8 @@ author: "Jasmin Mousavi"
 date: "10/7/2019"
 output: html_document
 ---
+[< Back to Portfolio](index.html) 
+
 ## **Gun Violence in the USA** 
 ***
 > Why did I choose this topic?
@@ -119,9 +121,9 @@ library("dplyr")
 library("lubridate")
 library("ggplot2")
 library("usmap")
-library(reshape2)
-library(summarytools)
-library(knitr)
+library("reshape2")
+library("summarytools")
+library("knitr")
 ```
 ***
 ## 2. Load Data 
@@ -467,6 +469,8 @@ year <- table(year=year(Incident_Stats$date)) #create data frame that separates 
 #Plot the data
 barplot(year, main="Incidents per Year", xlab="Year", col="#785EF0")
 ```
+
+
 * 2017 has the most incidents, followed by 2016.
 * One thing to note here is that the dataset does not include the all the months of 2018.
 * However, 2013 is strangely low, and it is something we should take a closer look at in the future. 
@@ -720,3 +724,9 @@ ggplot(Incident_Characteristics_Count , aes(x=incident_characteristics, y=n)) +
 3. Some argue that with the implementation of stricter gun laws, people would simply seek out other weapons. Considering countries which have enforced strict gun laws, was a difference in crime rates seen, an increase, decrease, or were the findings insignificant?
 
 Some social and ethical issues that come with this data are human biases and unfair discrimination. Human biases and discrimination can appear throught many different aspects of this data set. For example, when police officers are patrolling, arresting, or targeting citizens in some biased or discriminatory way. Building a model off biased data builds a biased model. Using such information to help improve our society can feed into the reinforcment of such biases, and may also lead to the improvement of select social groups or individuals. Using data from other countries as a proxy to make decisions for a different country can lead poor decision making. Although one model works for one country, that does not mean that the same model will work for another country. Models are not one size fits all, and it may not be possible to mitigate such biases and proxies in order to create a model that will work for all individuals in our society.
+
+***
+
+
+
+[Link to Part 2 of Portfolio >](P2.html)

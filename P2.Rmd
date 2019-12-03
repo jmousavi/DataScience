@@ -1,0 +1,377 @@
+---
+title: "P2"
+author: "Jasmin Mousavi"
+date: "11/18/2019"
+output: html_document
+---
+[< Back to Portfolio](index.html) 
+
+## **Gun Violence in the USA: Simple Modeling, Predicting, & Planning**
+
+Based upon our initial discovery in [part one](P1.html), I would like to investigate trends regarding the number of incidents within each state.
+
+Some of the questions we were left with revolved around potential political and social influences. Other questions revolve around the claims that organizations are making as to why gun violence is so high in the USA.
+
+In order to get better insight to these imporant questions, we must first make a simple model to determine existing trends that occur within our data.
+
+In this section, we will gather some new data regarding guns per capita, number of guns registered, and the population. Then we will use the population to determine the number of incidents per capita. With the new data we gathered and created, we will create a simple model to predict the number of incidents per capita. 
+
+Our simple model will provide us with better insight on what we need to investigate further, and perhaps bring to light some unexpected trends that exist within our data set.
+
+***
+
+## 1. Gather Data from part 1
+* We want to gather our tidy tables and work we did with our intial gun violence data set
+
+```{r results='hide'}
+install.packages("knitr", repos="http://cran.us.r-project.org")  #gather data
+library(knitr)
+purl("P1.Rmd", output = "part1.r")
+source("part1.r") #load the data from part 1
+```
+> Looking back at our tables
+
+### Participant_Info
+```{r}
+Participant_Info
+```
+
+### Participante_Incident_Info
+```{r}
+Participant_Incident_Info
+```
+
+### Gun_Info
+```{r}
+Gun_Info
+```
+
+### Incident_Stats
+```{r}
+Incident_Stats$date <- as.POSIXct(Incident_Stats$date) #fixes posixlt
+Incident_Stats
+```
+
+### Incident_Government_Info
+```{r}
+Incident_Government_Info
+```
+
+### Incident_Characteristics
+```{r}
+Incident_Characteristics
+```
+
+***
+## 2. Gathering New Data
+* Let's gather data regarding gun ownership throughout the USA
+  + source: https://www.thoughtco.com/gun-owners-percentage-of-state-populations-3325153
+* Potential issues with the source
+  + data gathered from survey done by Pew Research Center
+  + going to have to trust the integrity of Pew Research Center, and how they conducted the survey
+* Caveats with the data
+  + data is only for the year of 2017
+  + the year restriction will limit the scope of which we can make predictions an analyze 
+
+```{r}
+library(rvest)     #web scrapping
+library(tidyr)     #web scrapping
+library(stringr)   #web scrapping
+
+url<- "https://www.thoughtco.com/gun-owners-percentage-of-state-populations-3325153"
+
+webpage <- read_html(url) #read in the html from the url
+
+#use table headers as column names
+col_name<- webpage %>%
+  html_nodes("th") %>%
+  html_text()
+
+#save data inside table
+mydata <- webpage %>%
+  html_nodes("td") %>%
+  html_text()
+
+#convert scraped data to data frame
+Guns_Per_Capita <- data.frame(matrix(mydata, ncol=4, byrow=TRUE)) 
+
+Guns_Per_Capita <- Guns_Per_Capita[-1, ] 
+
+#rename columns 
+colnames(Guns_Per_Capita)[colnames(Guns_Per_Capita)=="X1"] <- "rank"
+colnames(Guns_Per_Capita)[colnames(Guns_Per_Capita)=="X2"] <- "state"
+colnames(Guns_Per_Capita)[colnames(Guns_Per_Capita)=="X3"] <- "num_of_guns_per_capita"
+colnames(Guns_Per_Capita)[colnames(Guns_Per_Capita)=="X4"] <- "num_of_guns_registered"
+
+Guns_Per_Capita <- as_tibble(Guns_Per_Capita)
+
+#clean & tidy data
+Guns_Per_Capita$num_of_guns_registered <- sub(",", "", Guns_Per_Capita$num_of_guns_registered)
+Guns_Per_Capita$num_of_guns_registered <- as.numeric(Guns_Per_Capita$num_of_guns_registered)
+Guns_Per_Capita$num_of_guns_per_capita <- as.character(Guns_Per_Capita$num_of_guns_per_capita)
+options(digits = 5)
+Guns_Per_Capita$num_of_guns_per_capita <- as.numeric(Guns_Per_Capita$num_of_guns_per_capita)
+Guns_Per_Capita$state <- sub("Washington D.C.", "Washington", Guns_Per_Capita$state)
+
+Guns_Per_Capita
+```
+
+Now, let's plot the data to get a better visualization
+```{r}
+Guns_Per_Capita_Subset <- Guns_Per_Capita %>% filter(num_of_guns_per_capita > 19) #Going to limit the guns per capita for those greater then 19
+
+#Plot the data
+ggplot(Guns_Per_Capita_Subset , aes(x=state, y=num_of_guns_per_capita)) + 
+  geom_bar(stat="identity", fill="#FE6100") + 
+  labs(x="State", y="Guns Per Capita")+
+  ggtitle("Guns Per Capita > 19")+
+  coord_flip()+
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+
+* Since the data we gathered describes guns per capita, let's gather population data in 2017 to make capita calculations to predict on
+* Population data in 2017
+  + souce: https://www.enchantedlearning.com/usa/states/population.shtml
+* Potential issues with the source
+  + states it gets the data from US Census Bureau
+  + have to trust it got the data from correctly 
+  + have to trust the US Census Bureau gathered data correctly
+```{r}
+
+url<- "https://www.enchantedlearning.com/usa/states/population.shtml"
+
+webpage <- read_html(url) #read in the html
+
+#use table headers as column names
+col_name<- webpage %>%
+  html_nodes("th") %>%
+  html_text()
+
+#save data inside table
+mydata <- webpage %>%
+  html_nodes("td") %>%
+  html_text()
+
+#convert scraped data to data frame
+Population_2017 <- data.frame(matrix(mydata, ncol=2, byrow=TRUE))
+
+Population_2017 <- Population_2017[-1, ] 
+
+#rename columns 
+colnames(Population_2017)[colnames(Population_2017)=="X1"] <- "state"
+colnames(Population_2017)[colnames(Population_2017)=="X2"] <- "population"
+
+
+Population_2017 <- as_tibble(Population_2017)
+
+#clean & tidy data
+Population_2017$state <- sub("\\d*\\. ", "", Population_2017$state)
+Population_2017$population <- sub(",", "", Population_2017$population)
+Population_2017$population <- sub(",", "", Population_2017$population)
+Population_2017$population <- as.numeric(Population_2017$population)
+Population_2017$state <- as.character(Population_2017$state)
+
+Population_2017
+```
+
+* Now, let's plot the data to get a better visualization
+```{r}
+Population_2017_Subset <- Population_2017 %>% filter(population > 6000000) #Going to limit the guns per capita for those greater then 6000000
+
+ggplot(Population_2017_Subset , aes(x=state, y=population)) + 
+  geom_bar(stat="identity", fill="#648FFF") + 
+  labs(x="State", y="Population")+
+  ggtitle("Population > 6000000") +
+  coord_flip()+
+  theme(plot.title = element_text(hjust=0.5))
+
+```
+
+
+* Now we can join our new tables with data from our old table 
+```{r}
+# Join our incident table with our guns per capita table, for only 2017 data
+State_Info <- Incident_Stats %>% 
+                    subset(format(as.Date(date),"%Y")==2017) %>%
+                    left_join(Guns_Per_Capita, by="state") %>%
+                    select(state,num_of_guns_per_capita,num_of_guns_registered,n_injured,n_killed,n_guns_involved)
+
+# Now join the talbe we just created with our population table                  
+State_Info <- State_Info %>% 
+                    left_join(Population_2017, by="state") %>%
+                    select(num_of_guns_per_capita,num_of_guns_registered,n_injured,n_killed,n_guns_involved,population,state)
+                    
+State_Info$state <- as.character(State_Info$state)
+
+#create incidents per capita column by calculating number of incidents and dividing it by the population
+State_Info$num_incidents <- as.numeric(ave(State_Info$state, State_Info$state, FUN = length))
+State_Info$num_incidents_per_capita <- State_Info$num_incidents/State_Info$population
+
+State_Info
+```
+
+
+* Plot the data of our new table to get a better visualization 
+```{r}
+library(reshape2) #used to melt data set
+Grouped_State_Info <- as.tibble(na.omit(State_Info)) %>% 
+                      group_by(state, num_of_guns_per_capita, num_incidents_per_capita) %>% 
+                      summarise(total=sum(num_of_guns_per_capita, num_incidents_per_capita)) %>%
+                      mutate("gun_percentage"=num_of_guns_per_capita/total,"incident_percentage"=num_incidents_per_capita/total) %>% 
+                      ungroup() %>%
+                      select(state, gun_percentage, incident_percentage) 
+
+Melted_State_Info <- melt(Grouped_State_Info, id.vars='state')
+ggplot(Melted_State_Info, aes(state,value,fill=variable)) +
+  geom_bar(stat="identity",position=position_stack()) +
+  scale_fill_manual(values=c("#DC267F", "#648FFF")) +
+  labs(x="State", y="Proportion")+
+  ggtitle("Proportion of Capita")+
+  theme(plot.title = element_text(hjust=0.5), axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+* As you can see, the incident percentage is magnatudes lower than the gun percentage where it isn't visible on the graph
+
+***
+## 3. Modeling
+* Let's create a linear model in order to determine good predictors for incidents_per_capita
+  + In order to calculate how well our model predicts, we should create a train and test set 
+  + We will build our model using the train set
+  + After we are satisfied with our model, we can test our predictions on the test set
+* Our first model will look at all values within our table in order to determine what are good predictors 
+```{r}
+library(caret) #lm model
+set.seed(385) #set the seed to get the same results 
+data_1 <- as_tibble(na.omit(State_Info)) #must remove na values when creating lm
+
+#Partition into Train(75%) and Test(25%) sets
+sample_1 <- createDataPartition(data_1$num_incidents_per_capita, p=0.75, list=FALSE)
+train_1 <- data_1[sample_1, ]
+test_1 <- data_1[-sample_1, ]
+
+#create linear model
+train_model_1 <- lm(formula= num_incidents_per_capita ~ num_of_guns_per_capita + num_of_guns_registered + num_incidents + n_injured + n_killed + n_guns_involved + population + state, data=train_1)
+
+summary(train_model_1) #view our model
+```
+
+
+* Here we can see that n_guns_involved and n_killed aren't the best predictors (high p-value)
+  + Let's make a model without these values
+```{r}
+#must remove na values when creating lm
+data_2 <- as_tibble(State_Info) %>% 
+  drop_na(num_of_guns_per_capita) %>%
+  drop_na(num_of_guns_registered) %>%
+  drop_na(num_incidents_per_capita) %>%
+  drop_na(population) %>%
+  drop_na(num_incidents) %>%
+  drop_na(n_injured) %>%
+  drop_na(state)
+
+#Partition into Train(75%) and Test(25%) sets
+sample_2 <- createDataPartition(data_2$num_incidents_per_capita, p=0.75, list=FALSE)
+train_2 <- data_2[sample_2, ]
+test_2 <- data_2[-sample_2, ]
+
+#create linear model
+train_model_2 <- lm(formula= num_incidents_per_capita ~ num_of_guns_per_capita + num_of_guns_registered + n_injured + num_incidents + population + state, data=train_2)
+
+summary(train_model_2)
+```
+
+
+* Looking at the different states, there is much variability here
+  + Depending on the state, it can be a positive or negative predictor for num_incidents_per_capita
+  + This could be due to differences in gun laws or some other factor
+  + Since this is so noisey, let's take the state out of our model
+  + Potentially, we can address this in the following investigation 
+
+* Create a model without state
+```{r}
+#must remove na values when creating lm
+data_3 <- as_tibble(State_Info) %>% 
+  drop_na(num_of_guns_per_capita) %>%
+  drop_na(num_of_guns_registered) %>%
+  drop_na(num_incidents_per_capita) %>%
+  drop_na(population) %>%
+  drop_na(num_incidents) %>%
+  drop_na(n_injured) %>%
+  drop_na(state)
+
+#Partition into Train(75%) and Test(25%) sets
+sample_3 <- createDataPartition(data_3$num_incidents_per_capita, p=0.75, list=FALSE)
+train_3 <- data_3[sample_3, ]
+test_3 <- data_3[-sample_3, ]
+
+#create linear model
+train_model_3 <- lm(formula= num_incidents_per_capita ~ num_of_guns_per_capita + num_of_guns_registered + num_incidents + population + n_injured, data=train_3)
+
+summary(train_model_3)#view our model
+```
+
+
+* Here we have all very low p-values, making everything a good predictor of num_incidents_per_capita
+* Our Predictors:
+  + num_guns_per_capita: Here we can see that that as guns per capita increases, incidents per capita increases
+  + num_of_guns_registered: Here we can see that as number of guns registered increases, incidents per capita decreases 
+  + num_incidents: Here we can see that as the number of incidents increases, the number of incidents per capita increases
+  + population: Here we can see that as population increases, then incidents per capita decreases
+  + n_injured: Here we can see as the number of injured increases, the incidents per capita increases
+* Interpreting model results:
+  + Positive predictors: nums_of_guns_per_capita, num_incidents, n_injured
+  + Negative predictors: num_of_guns_registered, population
+  + It is interesting to see that population and number of guns registered are negative predictors
+  + One would assume that the larger the population, the more incidents there are. Similarly, the greater number of registered guns, the more incidents there are. However, there could be stricter gun laws in states with larger populations which could be the cause as to why these values are identified as negative predictors
+  
+* Now we can calculate predictions using our model and test set
+```{r}
+predictions_3 <- train_model_3 %>% predict(test_3)
+
+#R2 is the sqare & root of the correlation (between 0[no correlation] and 1[perfect correlation])
+#RMSE is the standard deviation of the predicted errors
+#MAE mean absolute error of the distance between the predicted and actual value
+errors_3 <- data.frame(R2 = R2(predictions_3, test_3$num_incidents_per_capita),
+           RMSE = RMSE(predictions_3, test_3$num_incidents_per_capita),
+           MAE = MAE(predictions_3, test_3$num_incidents_per_capita))
+
+errors_3
+```
+
+
+* Here we can see that the R2 value is .7, making it a decent model at predicting num_incidents_per_capita
+* The R2, or correlation is .7
+* The RMSE, or standard deviation of the residuals is .00004
+  + Meaning, our predictions are determined the have an error (in the up or down direciction) of around .00004
+* The MAE, or the absolute error of the predicted error is .00003
+* Now, let's plot our predicted values vs our actual values
+```{r}
+ggplot(test_3, aes(x=predictions_3, y=num_incidents_per_capita), ) + geom_point()
+```
+
+
+* Here we can see that although our results are slightly noisey, the general trend seems to be positive
+
+> What are the limitations to our model?
+
+* Data sets are gathererd from different sources, and therefore conducted differently. This can lead to inconsistencies when making correlations or predictions
+* New data added is only for 2017 data, so the modeling and predictions are acting as a proxy for the rest of the data
+  + However our model is only making predictions for 2017
+  + In order to truly make a prediction for the entire data set, we would have to gather guns per capita data data and population data from 2013 to 2018
+* In order to understand the negative predictors in our final model, it would be necessary to gather more data in order to make sense of the existance of these trends
+
+***
+## 4. What should we investigate further? 
+* Due to the interesting results regarding the states while we were creating our model, we could potentially group together the states that were positive predictors and the states that were negative predictors 
+  + Perhaps grouping them will allow us to see futher trends 
+* Additionally, it would be interesting to see how many gun laws, differences in gun laws, or changes of gun laws (over the years):
+  + Effect our model
+  + Explain the negative predictors (population and number of guns registered) in our model 
+  + Explain why the state predictions were so noisey 
+* Investigating gun laws can potentially lead to answering some of the in depth questions that were asked in [part one](P1.html)
+
+***
+
+[Link to Part 3 of Portfolio >](P3.html)
