@@ -9,8 +9,14 @@ output: html_document
 ***
 Recently I have noticed many gun violence incidents. It is to the point where there have been more incidents than there have been days in this year. Hearing about such violences that happen every day makes this country immune to this type of news, when it should be taken more seriously. 
 
-I clean and analyze data and create models in the following 3 pages:
+In part one, I clean analyze data in order to determine patterns and insightful questions that need answers.
 
 * [Part 1](P1.html) 
+
+In part two, I build a gather more data to supplement the original data set. Then I build a simple model to find trends that exist exist within the data. The simple model leads to more questions that need to be answered.
+
 * [Part 2](P2.html)
+
+In part three, I build gather more data to supplement my simple model, and build a more robust model. Then, I discuss operationlaization plans and social impacts.
+
 * [Part 3](P3.html)
