@@ -1,0 +1,503 @@
+---
+title: "P3"
+author: "Jasmin Mousavi"
+date: "12/11/2019"
+output: html_document
+---
+[< Back to Portfolio](index.html) 
+
+## **Gun Violence in the USA: Modeling, Operationalize, and Social Impact**
+
+Based upon our simple modeling [part two](P2.html), I would like to build more sophisticated models to represent the gun violence data set.
+
+Our simple model showed some general trends that exist, however it brought up the question of whether gun laws play a factor within our model.
+
+In this section, we will gather 2017 number of gun laws per state and add that into our model that predicts incidents per capita. Next, we will make two more models to predict number of injuries per state and number of deaths per state.
+
+Creating better models will help us determine trends and make better decision when it comes to planning on how to operationalize.
+
+***
+
+## 1. Gather Data from part 1
+* We want to gather our tidy tables and simple models we created in part 2
+```{r results='hide'}
+#install.packages("knitr", repos="http://cran.us.r-project.org")  #gather data
+library(knitr)
+if(!file.exists("part2.r")){
+  purl("P2.Rmd", output = "part2.r")
+}
+source("part2.r") #load the data from part 1
+```
+
+> Looking back at our tables
+
+### Participant_Info
+```{r}
+Participant_Info
+```
+
+### Participante_Incident_Info
+```{r}
+Participant_Incident_Info
+```
+
+### Gun_Info
+```{r}
+Gun_Info
+```
+
+### Incident_Stats
+```{r}
+Incident_Stats$date <- as.POSIXct(Incident_Stats$date) #fixes posixlt
+Incident_Stats
+```
+
+### Incident_Government_Info
+```{r}
+Incident_Government_Info
+```
+
+### Incident_Characteristics
+```{r}
+Incident_Characteristics
+```
+
+##State_Info
+```{r}
+State_Info
+```
+
+***
+##2. Scrape the web to get gun law information
+
+* Let's gather data regarding number of gun laws per state in 2017
+  + source: https://statefirearmlaws.org/national-data/2017
+* Potential issues with the source
+  + data gathered from survey done by Boston University
+  + going to have to trust the integrity of Boston University, and how they conducted the survey
+* Caveats with the data
+  + Since our previous data dealt with 2017, the number of gun laws data must also reflect that
+  + the year restriction will limit the scope of which we can make predictions an analyze 
+
+```{r}
+library(rvest)     #web scrapping
+library(tidyr)     #web scrapping
+library(stringr)   #web scrapping
+
+#state abreviations to put into urls to scrape
+states <- c('AK', 'AL', 'AR', 'AZ', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MI', 'MN', 'MO', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'VT', 'WA', 'WI', 'WV', 'WY')
+
+
+##could not scrape data from original url since data is being loaded asynchronously 
+#url<- "https://statefirearmlaws.org/national-data/2017"
+
+#list of all urls
+urls <- sprintf("https://statefirearmlaws.org/states/%s/2017", states)
+
+#list of number of laws 
+laws_web <- lapply(urls, function(u){
+  webpage <- read_html(u)
+  name <- webpage %>% 
+   html_nodes(".state-name-laws div") %>%
+     html_text()
+  # Delay calls to prevent exceeding speed limit
+  Sys.sleep(1)
+  return(name[1])
+})
+
+#list of states 
+states_web <- lapply(urls, function(u){
+  webpage <- read_html(u)
+  name <- webpage %>% 
+   html_nodes("h2") %>%
+     html_text()
+  # Delay calls to prevent exceeding speed limit
+  Sys.sleep(1)
+  return(name[2])
+})
+
+#convert format of scraped data
+#states <- do.call(rbind.data.frame, states_web)
+num_laws <- do.call(rbind.data.frame, laws_web)
+
+#save new data into data frame 
+GunLaws2017 <- data.frame("states"=states, "num_gun_laws"=num_laws)
+
+#change column names
+names(GunLaws2017)[1]<-"state"
+names(GunLaws2017)[2]<-"num_gun_laws"
+
+#convert data frame to tible
+GunLaws2017 <- as.tibble(GunLaws2017)
+
+#make number of gun laws numeric (tidy)
+GunLaws2017$num_gun_laws <- as.numeric(as.character(GunLaws2017$num_gun_laws))
+
+GunLaws2017
+```
+
+* Now, let's plot the data to see which states have the least amount of gun laws in the USA in 2017
+```{r}
+#Graph the states with less then 10 gun laws
+GunLaws2017 %>% filter(num_gun_laws < 10) %>% ggplot(aes(x=state, y=num_gun_laws)) + 
+  geom_bar(stat="identity", fill="#648FFF") + 
+  labs(x="State", y="Number of Laws")+
+  ggtitle("States with less then 10 gun Laws")+
+  coord_flip()+
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+
+* Merge the old State_Info table with the scraped data 
+```{r}
+#join by state
+State_Info <- State_Info %>% 
+                    left_join(GunLaws2017, by="state") %>%
+                    select(state,num_incidents,population,num_gun_laws,num_incidents_per_capita,num_of_guns_per_capita,num_of_guns_registered,n_injured,n_killed,n_guns_involved)
+
+State_Info
+```
+
+***
+##3. Modeling
+
+* create a new model using the same variables in [part two](P2.html), but adding number of gun laws
+```{r}
+#must remove na values when creating lm
+data_4 <- as_tibble(State_Info) %>% 
+  drop_na(num_of_guns_per_capita) %>%
+  drop_na(num_of_guns_registered) %>%
+  drop_na(num_incidents_per_capita) %>%
+  drop_na(population) %>%
+  drop_na(num_incidents) %>%
+  drop_na(state) %>%
+  drop_na(num_gun_laws)
+
+#Partition into Train(75%) and Test(25%) sets
+sample_4 <- createDataPartition(data_4$num_incidents_per_capita, p=0.75, list=FALSE)
+train_4 <- data_4[sample_4, ]
+test_4 <- data_4[-sample_4, ]
+
+#create linear model
+train_model_4 <- lm(formula=num_incidents_per_capita ~ num_of_guns_per_capita + num_of_guns_registered + num_incidents + population + num_gun_laws, data=train_4)
+
+summary(train_model_4)#view our model
+```
+
+
+* I found this to be interesting since num_gun_laws is a negative predictor 
+* Adding number of laws helped increase the adjusted r-squared value by .01
+
+*Let's see if number of gun laws has an interaction with number of incidents 
+```{r}
+#must remove na values when creating lm
+data_5 <- as_tibble(State_Info) %>% 
+  drop_na(num_of_guns_per_capita) %>%
+  drop_na(num_of_guns_registered) %>%
+  drop_na(num_incidents_per_capita) %>%
+  drop_na(population) %>%
+  drop_na(num_incidents) %>%
+  drop_na(state)
+
+#Partition into Train(75%) and Test(25%) sets
+sample_5 <- createDataPartition(data_5$num_incidents_per_capita, p=0.75, list=FALSE)
+train_5 <- data_5[sample_5, ]
+test_5 <- data_5[-sample_5, ]
+
+#create linear model
+train_model_5 <- lm(formula=num_incidents_per_capita ~ num_of_guns_per_capita + num_of_guns_registered + num_incidents * num_gun_laws + population, data=train_5)
+
+summary(train_model_5)#view our model
+```
+
+
+* Here we have all very low p-values, making everything a good predictor of num_incidents_per_capita
+* Our Predictors:
+  + num_guns_per_capita: Here we can see that that as guns per capita increases, incidents per capita decreases
+  + num_of_guns_registered: Here we can see that as number of guns registered increases, incidents per capita increases 
+  + num_incidents: Here we can see that as number number of incidents increases, incidents per capita increases 
+  + num_gun_laws: Here we can see that that as number of gun laws increases, incidents per capita decreases
+  + population: Here we can see that as population decreases, then incidents per capita increases
+  + num_incidents interaction with num_gun_laws: Here we can see that as the interaction increases increases, the number of incidents per capita increases
+
+* Interpreting model results:
+  + Positive predictors: num_of_guns_registered, num_incidents, n_injured, num+incidents:num_gun_laws
+  + Negative predictors: num_gun_laws, population, nums_of_guns_per_capita,
+  + It is interesting to see that population, number of guns registered, number of guns per capita are negative predictors, however this could be due to the fact that number of incidents per capita is a low number
+  + I would be interested to make more models in order to get better insight into how these gun laws play into action. Potentially, larger states like California which have larger populations, will still have greater incidents. However, due to the 106 gun laws, perhaps the death/injure toll is not as bad. 
+  + Predicting for number of injured per state and number of killed per state could lead to more insights on how to operationalize 
+  
+*Now let's look at the predictions 
+```{r}
+predictions_5 <- train_model_5 %>% predict(test_5)
+
+#R2 is the sqare & root of the correlation (between 0[no correlation] and 1[perfect correlation])
+#RMSE is the standard deviation of the predicted errors
+#MAE mean absolute error of the distance between the predicted and actual value
+errors_5 <- data.frame(R2 = R2(predictions_5, test_5$num_incidents_per_capita),
+           RMSE = RMSE(predictions_5, test_5$num_incidents_per_capita),
+           MAE = MAE(predictions_5, test_5$num_incidents_per_capita))
+
+errors_5
+```
+
+* Here we can see that the R2 value is .73, making it a decent model at predicting num_incidents_per_capita
+* The R2, or correlation is .73
+* The RMSE, or standard deviation of the residuals is .00004
+  + Meaning, our predictions are determined the have an error (in the up or down direciction) of around .00004
+* The MAE, or the absolute error of the predicted error is .00003
+* Now, let's plot our predicted values vs our actual values
+```{r}
+ggplot(test_5, aes(x=predictions_5, y=num_incidents_per_capita), ) + 
+  geom_point() +
+  labs(x="Predictions", y="Incidents Per Capita")+
+  ggtitle("Predictions of Incidents Per Capita")
+```
+
+
+* Here we can see that although our results are slightly noisey, the general trend seems to be positive
+
+*Now let's calculate number of injured and killed per capita for each state
+```{r}
+  
+#get total for each state
+total_killed <- State_Info %>% group_by(state) %>% summarise(total_killed=sum(n_killed))
+total_injured <- State_Info %>% group_by(state) %>% summarise(total_injured=sum(n_injured))
+
+#merge results to our original table
+State_Info <- State_Info %>% 
+                    left_join(total_killed, by="state") %>%
+                    select(state,num_incidents,population,num_gun_laws,num_incidents_per_capita,num_of_guns_per_capita,num_of_guns_registered,n_injured,n_killed,n_guns_involved, total_killed)
+
+State_Info <- State_Info %>% 
+                    left_join(total_injured, by="state") %>%
+                    select(state,num_incidents,population,num_gun_laws,num_incidents_per_capita,num_of_guns_per_capita,num_of_guns_registered,n_injured,n_killed,n_guns_involved, total_killed, total_injured)
+
+#calculate per capita 
+State_Info$num_injured_per_capita <- State_Info$total_injured/State_Info$population
+State_Info$num_killed_per_capita <- State_Info$total_killed/State_Info$population
+
+State_Info
+```
+
+
+*Now let's graph our new data to get a better idea of what's going on
+```{r}
+State_Info %>% filter(num_injured_per_capita > .0001) %>% ggplot(aes(x=state, y=num_injured_per_capita)) + 
+  geom_bar(stat="identity", fill="#648FFF") + 
+  labs(x="State", y="Number Injured Per Capita")+
+  ggtitle("States with more then .0001 injured per capita")+
+  coord_flip()+
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+
+*Here we can see that Illinois and Louisina are the highest number of injured per capita
+```{r}
+State_Info %>% filter(num_gun_laws < 20) %>% ggplot(aes(x=state, y=num_injured_per_capita)) + 
+  geom_bar(stat="identity", fill="#648FFF") + 
+  labs(x="State", y="Number Injured Per Capita")+
+  ggtitle("States with less then 20 gun Laws")+
+  coord_flip()+
+  theme(plot.title = element_text(hjust=0.5))
+```
+
+
+*Here we can also see that Louisiana has less then 20 gun laws
+
+*Now let's make a new model to predict for number of injured per capita 
+```{r}
+#must remove na values when creating lm
+data_6 <- as_tibble(State_Info) %>% 
+  drop_na(num_of_guns_per_capita) %>%
+  drop_na(num_of_guns_registered) %>%
+  drop_na(num_incidents_per_capita) %>%
+  drop_na(population) %>%
+  drop_na(num_incidents) %>%
+  drop_na(state) %>%
+  drop_na(total_killed) %>%
+  drop_na(total_injured)%>%
+  drop_na(num_injured_per_capita)
+
+#Partition into Train(75%) and Test(25%) sets
+sample_6 <- createDataPartition(data_6$num_injured_per_capita, p=0.75, list=FALSE)
+train_6 <- data_6[sample_6, ]
+test_6 <- data_6[-sample_6, ]
+
+#create linear model
+train_model_6 <- lm(formula=num_injured_per_capita ~  num_gun_laws + num_incidents_per_capita + num_of_guns_per_capita + num_of_guns_registered + num_incidents + population + total_injured, data=train_6)
+
+summary(train_model_6)#view our model
+```
+
+
+* Here we have all very low p-values, making everything a good predictor of num_injured_per_capita
+* Our Predictors:
+  + num_gun_laws: Here we can see that that as number of gun laws decreases, injured per capita increases
+  + num_incidents_per_capita: Here we can see that as incidents per capita registered increases, injured per capita increases
+  + num_guns_per_capita: Here we can see that that as guns per capita decreases, injured per capita increases
+  + num_of_guns_registered: Here we can see that as number of guns registered decreases, injured per capita increases 
+  + num_incidents: Here we can see that as number number of incidents decreases, injured per capita increases 
+  + population: Here we can see that as population increases, then injured per capita increases
+  + total_injured: Here we can see that as number of injured increases, then injured per capita icnreases
+
+* Interpreting model results:
+  + Positive predictors: num_incidents_per_capita, total_injured, population
+  + Negative predictors: num_gun_laws, population, nums_of_guns_per_capita, num_of_guns_registered, num_incidents
+  + It is also interesting to see that as the number of gun laws decrease, the injuries increase 
+  + I am interested in making another model to test the severity of these incidents. Making a model for number of deaths can help determine if less gun laws (for example: legally buying high quality bullets aka 'cop killer bullets') can lead to a more deaths
+  
+
+* Let's graph our predictions for this model
+```{r}
+predictions_6 <- train_model_6 %>% predict(test_6)
+
+#R2 is the sqare & root of the correlation (between 0[no correlation] and 1[perfect correlation])
+#RMSE is the standard deviation of the predicted errors
+#MAE mean absolute error of the distance between the predicted and actual value
+errors_6 <- data.frame(R2 = R2(predictions_6, test_6$num_injured_per_capita),
+           RMSE = RMSE(predictions_6, test_6$num_injured_per_capita),
+           MAE = MAE(predictions_6, test_6$num_injured_per_capita))
+
+errors_6
+```
+
+* Here we can see that the R2 value is .95, making it a decent model at predicting num_incidents_per_capita
+* The R2, or correlation is .95
+* The RMSE, or standard deviation of the residuals is .00001
+  + Meaning, our predictions are determined the have an error (in the up or down direciction) of around .00001
+* The MAE, or the absolute error of the predicted error is .000009
+* Now, let's plot our predicted values vs our actual values
+```{r}
+ggplot(test_6, aes(x=predictions_6, y=num_injured_per_capita), ) + 
+  geom_point() +
+  labs(x="Predictions", y="Total Injured")+
+  ggtitle("Predictions of Total Injured Model")
+```
+
+
+* You can see a positive trend with our model 
+
+*Now let's make another model for numer of deaths per capita 
+```{r}
+#must remove na values when creating lm
+data_7 <- as_tibble(State_Info) %>% 
+  drop_na(num_of_guns_per_capita) %>%
+  drop_na(num_of_guns_registered) %>%
+  drop_na(num_incidents_per_capita) %>%
+  drop_na(population) %>%
+  drop_na(num_incidents) %>%
+  drop_na(state) %>%
+  drop_na(total_killed) %>%
+  drop_na(total_injured) %>%
+  drop_na(num_killed_per_capita)
+
+#Partition into Train(75%) and Test(25%) sets
+sample_7 <- createDataPartition(data_7$num_killed_per_capita, p=0.75, list=FALSE)
+train_7 <- data_7[sample_7, ]
+test_7 <- data_7[-sample_7, ]
+
+#create linear model
+train_model_7 <- lm(formula=num_killed_per_capita ~ num_gun_laws + num_incidents_per_capita + num_of_guns_per_capita + num_of_guns_registered + num_incidents + population + total_killed, data=train_7)
+
+summary(train_model_7)#view our model
+```
+
+
+* Here we have all very low p-values, making everything a good predictor of num_injured_per_capita
+* Our Predictors:
+  + num_gun_laws: Here we can see that that as number of gun laws decreases, killed per capita increases
+  + num_guns_per_capita: Here we can see that that as guns per capita increases, killed per capita increases
+    + num_incidents_per_capita: Here we can see that as incidents per capita registered increases, killed per capita increases
+  + num_of_guns_registered: Here we can see that as number of guns registered decreqses, killed per capita increases 
+  + num_incidents: Here we can see that as number number of incidents decreases, killed per capita increases 
+  + population: Here we can see that as population decreases, then killed per capita increases
+  + total_killed: Here we can see that as total number killed increases, killed per capita increases
+
+* Interpreting model results:
+  + Positive predictors: num_incidents_per_capita, num_of_guns_per_capita, total_killed
+  + Negative predictors: num_gun_laws, num_incidents, num_of_guns_registered, population
+  + It is interesting to see that there are more killed when the population decreases
+  + It is also interesting to see that as the number of gun laws decrease, the deaths increase. However this is orders of magnitudes smaller then the injured model
+* Between the killed/injured model there seems to be a trend of less gun laws lead to more deaths/injuries. 
+* However, in this model a notable difference is shown, as the population decreases -> deaths increase
+  + This could be due to less populated, rural areas having less gun laws. 
+  + For example, when looking at California, not only is the population high, but so are the number of gun laws. 
+  + Based off the models output, as population increases, deaths decrease. Meaning that California could potentially have less deaths then those states with smaller populations and less gun laws
+  
+* Now let's look at the predictions for this model 
+```{r}
+predictions_7 <- train_model_7 %>% predict(test_7)
+
+#R2 is the sqare & root of the correlation (between 0[no correlation] and 1[perfect correlation])
+#RMSE is the standard deviation of the predicted errors
+#MAE mean absolute error of the distance between the predicted and actual value
+errors_7 <- data.frame(R2 = R2(predictions_7, test_7$num_killed_per_capita),
+           RMSE = RMSE(predictions_7, test_7$num_killed_per_capita),
+           MAE = MAE(predictions_7, test_7$num_killed_per_capita))
+
+errors_7
+```
+
+
+* Here we can see that the R2 value is .899, making it a decent model at predicting num_incidents_per_capita
+* The R2, or correlation is .899
+* The RMSE, or standard deviation of the residuals is .000008
+  + Meaning, our predictions are determined the have an error (in the up or down direciction) of around .000008
+* The MAE, or the absolute error of the predicted error is .0000058
+* Now, let's plot our predicted values vs our actual values
+```{r}
+ggplot(test_7, aes(x=predictions_7, y=num_killed_per_capita), ) + 
+  geom_point() +
+  labs(x="Predictions", y="Total Killed")+
+  ggtitle("Predictions of Total Killed Model")
+```
+
+
+* You can see a positive trend with our model
+  + Not as great as our injured model, but still very good
+
+***
+##4. Operationalize
+
+* What can we do next?
+  + Based off the models we built, it is safe to say that increase the gun laws leads to a decrease in injures and deaths. There is a clear correlation between number of laws and gun violence within the USA. I think its ridiculous that the NRA blames violent video games when the evidence is VERY CLEAR that this is not the case.
+  + Using 2017 data as a proxy, I would suggest enforcing stricter gun laws in order to decrease gun violence.
+* Data collection & automation
+  + The limitations to this model is that it is only for 2017. More data needs to be gathered in order to determine if the same trends exist for all years.
+  + Data for gun violence is not exactly robust. As the NRA continues to pay off polticians, it will be extremely difficult to obtain quality data and passing of gun laws.
+  + However, if more gun laws were passed it would be imporant to continue to collect data such as number of gun laws, incidents, injured, killed, guns owned, population ... (all our old data). It will also be imporant to collect new data on who owns guns/bullets that become illegal after the laws are enforced. 
+  + This data collection should be done by the government, and the government should be keeping a careful eye on what guns are sold, what companies/stores sell guns or bullets, and to make sure nothing shady is going on. Perhaps the governemnt could develop a system that could automate this process, only allowing stores who use this to sell firearms.
+  + Enforcing stricter gun laws can result in negative consequences of selling/creating these kinds of illegal fire arms on the black market. It would be essential to monitor this and see if there is an increase in activity.
+  + It might be a good idea to make the public turn these items in for money, but I think this would piss alot of Americans off. It would also be hard to track down who has these illegal firearms.
+  + If people start turning to the black market or reverse engineering illegal fire arms to sell, then enforcing stricter laws are pointless.
+
+***
+##5. Social Impact
+
+* As this will impact gun owners/pro gun people, I am sure enforcing stricter gun laws will piss them off.
+  + They will probably feel that they are good guys and just because one person is crazy, doesn't mean all gun owners are.
+  + Although this is true, it only takes 1 person to kill many innocent lives
+* Knowing this, enforcing stricter gun laws can lead to an unspoken incentive. An incentive to sell illegal fire arms for lots of money. These illegal firearms can include:
+  + Those that were obtained when the law to have these guns were illegal 
+  + Those that have been reversed engineered 
+* If enforcing strict gun laws just leads to them still being sold in the black market, this could have even more negative impacts then what we started with in terms of being unable to track down guns.
+* If americans still have access to these firearms, then the gun laws are essentially useless and will have no effect on decreasing injuries are deaths within the USA.
+* In order to prevent this, it is imporant to keep track of activity on the black market
+  + If illegal fire arms are being made and sold and gun violence isn't decreasing, it would be necessary to refine our model and create a new plan to operationalize 
+  
+***
+##6. Further Discussion 
+
+* Although increasing gun laws can lead selling illegal firearms, I have reason to beleive there will be less gun violence within the USA
+* A great example of this is Austrlia
+  + Australia is a country that is well known for passing strict gun laws after dealing with several instances of gun violence
+  + Since passing these laws, they have had a significant decrease in gun violence
+  + However, this again is a proxy, and perhaps culutural/societal differences can lead to different results in the USA
+* In the future I would like to build more robust models for more years, and compare each state to itself in  a year which the state had less gun laws
+* In conclusion:
+  + As of December 1, which is the 335th day of the year, there have been 385 mass shootings in the USA in 2019
+  + Gun violence is a serious problem in the USA, and there needs to be more effort in fighting this issue
+  + As long as big corporations/companies, super pacs, and billionaires influence our politicians, corruption will rule our government
+  + This corruption isn't only affecting gun violence, but also several other areas within our government
+  + If we want real change in our policies, it is detrimental to our society to fight this corruption by getting educated on the polticians we are voting into office.
