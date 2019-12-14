@@ -68,7 +68,7 @@ State_Info
 ```
 
 ***
-##2. Scrape the web to get gun law information
+## 2. Scrape the web to get gun law information
 
 * Let's gather data regarding number of gun laws per state in 2017
   + source: https://statefirearmlaws.org/national-data/2017
@@ -91,47 +91,62 @@ states <- c('AK', 'AL', 'AR', 'AZ', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'I
 ##could not scrape data from original url since data is being loaded asynchronously 
 #url<- "https://statefirearmlaws.org/national-data/2017"
 
-#list of all urls
-urls <- sprintf("https://statefirearmlaws.org/states/%s/2017", states)
 
-#list of number of laws 
-laws_web <- lapply(urls, function(u){
-  webpage <- read_html(u)
-  name <- webpage %>% 
-   html_nodes(".state-name-laws div") %>%
-     html_text()
-  # Delay calls to prevent exceeding speed limit
-  Sys.sleep(1)
-  return(name[1])
-})
+#WHEN KNITTING, CODE WOULD HANG AND TAKE FOREVER DUE TO THE WEBSITE BEING ASYNCHRONOUS (I waited for 2 hours)
+#In order to avoid this, I decided to save this work I did in Rstudio to a csv
+#I will upload this csv to github and pull the data from this csv
 
-#list of states 
-states_web <- lapply(urls, function(u){
-  webpage <- read_html(u)
-  name <- webpage %>% 
-   html_nodes("h2") %>%
-     html_text()
-  # Delay calls to prevent exceeding speed limit
-  Sys.sleep(1)
-  return(name[2])
-})
+if(FALSE){
+  #list of all urls
+  urls <- sprintf("https://statefirearmlaws.org/states/%s/2017", states)
+  
+  #knit hangs when running this, probably because this website is asynchronous 
+  #list of number of laws 
+  laws_web <- lapply(urls, function(u){
+    webpage <- read_html(u)
+    name <- webpage %>% 
+     html_nodes(".state-name-laws div") %>%
+       html_text()
+    # Delay calls to prevent exceeding speed limit
+    Sys.sleep(1)
+    return(name[1])
+  })
+  
+  #knit hangs when running this, probably because this website is asynchronous 
+  #list of states 
+  
+  states_web <- lapply(urls, function(u){
+    webpage <- read_html(u)
+    name <- webpage %>% 
+     html_nodes("h2") %>%
+       html_text()
+    # Delay calls to prevent exceeding speed limit
+    Sys.sleep(1)
+    return(name[2])
+  })
+  
+  #convert format of scraped data
+  states <- do.call(rbind.data.frame, states_web)
+  num_laws <- do.call(rbind.data.frame, laws_web)
+  
+  #save new data into data frame 
+  GunLaws2017 <- data.frame("states"=states, "num_gun_laws"=num_laws)
+  
+  #change column names
+  names(GunLaws2017)[1]<-"state"
+  names(GunLaws2017)[2]<-"num_gun_laws"
+  
+  #convert data frame to tible
+  GunLaws2017 <- as_tibble(GunLaws2017)
+  
+  #make number of gun laws numeric (tidy)
+  GunLaws2017$num_gun_laws <- as.numeric(as.character(GunLaws2017$num_gun_laws))
+  
+  write.csv(GunLaws2017, file="GunLaws2017.csv")
+}
 
-#convert format of scraped data
-#states <- do.call(rbind.data.frame, states_web)
-num_laws <- do.call(rbind.data.frame, laws_web)
-
-#save new data into data frame 
-GunLaws2017 <- data.frame("states"=states, "num_gun_laws"=num_laws)
-
-#change column names
-names(GunLaws2017)[1]<-"state"
-names(GunLaws2017)[2]<-"num_gun_laws"
-
-#convert data frame to tible
-GunLaws2017 <- as.tibble(GunLaws2017)
-
-#make number of gun laws numeric (tidy)
-GunLaws2017$num_gun_laws <- as.numeric(as.character(GunLaws2017$num_gun_laws))
+GunLaws2017 <- read.csv(file="GunLaws2017.csv", header=TRUE, sep=",")
+GunLaws2017 <- as_tibble(GunLaws2017)
 
 GunLaws2017
 ```
@@ -159,7 +174,7 @@ State_Info
 ```
 
 ***
-##3. Modeling
+## 3. Modeling
 
 * create a new model using the same variables in [part two](P2.html), but adding number of gun laws
 ```{r}
@@ -281,7 +296,7 @@ State_Info
 ```
 
 
-*Now let's graph our new data to get a better idea of what's going on
+* Now let's graph our new data to get a better idea of what's going on
 ```{r}
 State_Info %>% filter(num_injured_per_capita > .0001) %>% ggplot(aes(x=state, y=num_injured_per_capita)) + 
   geom_bar(stat="identity", fill="#648FFF") + 
@@ -292,7 +307,7 @@ State_Info %>% filter(num_injured_per_capita > .0001) %>% ggplot(aes(x=state, y=
 ```
 
 
-*Here we can see that Illinois and Louisina are the highest number of injured per capita
+* Here we can see that Illinois and Louisina are the highest number of injured per capita
 ```{r}
 State_Info %>% filter(num_gun_laws < 20) %>% ggplot(aes(x=state, y=num_injured_per_capita)) + 
   geom_bar(stat="identity", fill="#648FFF") + 
@@ -303,9 +318,9 @@ State_Info %>% filter(num_gun_laws < 20) %>% ggplot(aes(x=state, y=num_injured_p
 ```
 
 
-*Here we can also see that Louisiana has less then 20 gun laws
+* Here we can also see that Louisiana has less then 20 gun laws
 
-*Now let's make a new model to predict for number of injured per capita 
+* Now let's make a new model to predict for number of injured per capita 
 ```{r}
 #must remove na values when creating lm
 data_6 <- as_tibble(State_Info) %>% 
@@ -458,7 +473,7 @@ ggplot(test_7, aes(x=predictions_7, y=num_killed_per_capita), ) +
   + Not as great as our injured model, but still very good
 
 ***
-##4. Operationalize
+## 4. Operationalize
 
 * What can we do next?
   + Based off the models we built, it is safe to say that increase the gun laws leads to a decrease in injures and deaths. There is a clear correlation between number of laws and gun violence within the USA. I think its ridiculous that the NRA blames violent video games when the evidence is VERY CLEAR that this is not the case.
@@ -473,7 +488,7 @@ ggplot(test_7, aes(x=predictions_7, y=num_killed_per_capita), ) +
   + If people start turning to the black market or reverse engineering illegal fire arms to sell, then enforcing stricter laws are pointless.
 
 ***
-##5. Social Impact
+## 5. Social Impact
 
 * As this will impact gun owners/pro gun people, I am sure enforcing stricter gun laws will piss them off.
   + They will probably feel that they are good guys and just because one person is crazy, doesn't mean all gun owners are.
@@ -487,7 +502,7 @@ ggplot(test_7, aes(x=predictions_7, y=num_killed_per_capita), ) +
   + If illegal fire arms are being made and sold and gun violence isn't decreasing, it would be necessary to refine our model and create a new plan to operationalize 
   
 ***
-##6. Further Discussion 
+## 6. Further Discussion 
 
 * Although increasing gun laws can lead selling illegal firearms, I have reason to beleive there will be less gun violence within the USA
 * A great example of this is Austrlia
