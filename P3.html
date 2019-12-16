@@ -612,7 +612,7 @@ states &lt;- c('AK', 'AL', 'AR', 'AZ', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI',
 #WHEN KNITTING, CODE WOULD HANG AND TAKE FOREVER DUE TO THE WEBSITE BEING ASYNCHRONOUS (I waited for 2 hours)
 #In order to avoid this, I decided to save this work I did in Rstudio to a csv
 #I will upload this csv to github and pull the data from this csv
-
+#Uncomment if(FALSE) statement in order to run and produce your own csv
 if(FALSE){
   #list of all urls
   urls &lt;- sprintf(&quot;https://statefirearmlaws.org/states/%s/2017&quot;, states)
